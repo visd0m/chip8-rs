@@ -2,7 +2,7 @@ use crate::emulator::cpu::{Cpu, CpuError};
 use crate::emulator::display::{Display, HEIGHT, WIDTH};
 use crate::emulator::keyboard::Keyboard;
 use crate::emulator::memory::Memory;
-use crate::emulator::sound::{Sound, SoundError};
+use crate::emulator::sound::{Audio, AudioError};
 use minifb::{Key, Scale, ScaleMode, Window, WindowOptions};
 use std::thread::sleep;
 use std::time::Duration;
@@ -20,12 +20,12 @@ pub enum EmulatorError {
     #[error(transparent)]
     CpuError(#[from] CpuError),
     #[error(transparent)]
-    SoundError(#[from] SoundError),
+    SoundError(#[from] AudioError),
 }
 
 pub struct Emulator {
     display: Display,
-    sound: Sound,
+    sound: Audio,
     cpu: Cpu,
 }
 
@@ -47,12 +47,12 @@ impl Emulator {
         .unwrap_or_else(|e| {
             panic!("{}", e);
         });
-        window.limit_update_rate(Some(std::time::Duration::from_micros(16)));
+        window.limit_update_rate(Some(std::time::Duration::from_micros(5)));
 
         Ok(Self {
             display: Display::new(window),
             cpu: Cpu::new(memory),
-            sound: Sound::new()?,
+            sound: Audio::new()?,
         })
     }
 
@@ -65,7 +65,7 @@ impl Emulator {
 
             self.display.update();
 
-            sleep(Duration::from_millis(16));
+            sleep(Duration::from_millis(5));
         }
 
         Ok(())

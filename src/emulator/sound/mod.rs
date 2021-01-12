@@ -1,15 +1,12 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{
-    BuildStreamError, DefaultStreamConfigError, Device, PauseStreamError, PlayStreamError, Stream,
-    StreamConfig,
+    BuildStreamError, DefaultStreamConfigError, Device, PauseStreamError, PlayStreamError, Sample,
+    SampleFormat, Stream, StreamConfig,
 };
-use std::any::Any;
-use std::fs::File;
-use std::io::BufReader;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum SoundError {
+pub enum AudioError {
     #[error("No available audio output device")]
     NoOutputDeviceError,
     #[error(transparent)]
@@ -22,16 +19,16 @@ pub enum SoundError {
     BuildStreamError(#[from] BuildStreamError),
 }
 
-pub struct Sound {
+pub struct Audio {
     device: Device,
     stream: Option<Stream>,
 }
 
-impl Sound {
-    pub fn new() -> Result<Sound, SoundError> {
+impl Audio {
+    pub fn new() -> Result<Audio, AudioError> {
         let device = cpal::default_host()
             .default_output_device()
-            .ok_or(SoundError::NoOutputDeviceError)?;
+            .ok_or(AudioError::NoOutputDeviceError)?;
 
         Ok(Self {
             device,
@@ -39,30 +36,17 @@ impl Sound {
         })
     }
 
-    pub fn beep(&mut self) -> Result<(), SoundError> {
+    pub fn beep(&mut self) -> Result<(), AudioError> {
         if self.stream.is_some() {
             return Ok(());
         }
 
-        let config: &StreamConfig = &self.device.default_output_config()?.into();
-        let sample_rate = config.sample_rate.0 as f32;
-        let channels = config.channels as usize;
-
-        let mut sample_clock = 0f32;
-        let mut next_value = move || {
-            sample_clock = (sample_clock + 1.0) % sample_rate;
-            (sample_clock * 440.0 * 2.0 * std::f32::consts::PI / sample_rate).sin()
-        };
-
-        let err_fn = |err| eprintln!("an error occurred on stream: {}", err);
-
-        let stream = self.device.build_output_stream(
-            config,
-            move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                write_data(data, channels, &mut next_value)
-            },
-            err_fn,
-        )?;
+        let config = self.device.default_output_config()?;
+        let stream = match config.sample_format() {
+            SampleFormat::F32 => beep_stream::<f32>(&self.device, &config.into()),
+            SampleFormat::I16 => beep_stream::<i16>(&self.device, &config.into()),
+            SampleFormat::U16 => beep_stream::<u16>(&self.device, &config.into()),
+        }?;
 
         stream.play()?;
         self.stream = Some(stream);
@@ -70,13 +54,40 @@ impl Sound {
         Ok(())
     }
 
-    pub fn stop_beep(&mut self) -> Result<(), SoundError> {
-        if let Some(_) = self.stream {
+    pub fn stop_beep(&mut self) -> Result<(), AudioError> {
+        if self.stream.is_some() {
             self.stream = None
         }
 
         Ok(())
     }
+}
+
+fn beep_stream<T>(device: &Device, config: &StreamConfig) -> Result<Stream, AudioError>
+where
+    T: Sample,
+{
+    let sample_rate = config.sample_rate.0 as f32;
+    let channels = config.channels as usize;
+
+    let mut sample_clock = 0f32;
+    let mut next_value = move || {
+        sample_clock = (sample_clock + 1.0) % sample_rate;
+        (sample_clock * 440.0 * 2.0 * std::f32::consts::PI / sample_rate).sin()
+    };
+
+    let err_fn = |err| eprintln!("an error occurred on stream: {}", err);
+
+    let stream = device.build_output_stream(
+        config,
+        move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
+            write_data(data, channels, &mut next_value)
+        },
+        err_fn,
+    )?;
+
+    stream.play()?;
+    Ok(stream)
 }
 
 fn write_data<T>(output: &mut [T], channels: usize, next_sample: &mut dyn FnMut() -> f32)

@@ -3,7 +3,7 @@ use crate::emulator::display::{Display, HEIGHT, WIDTH};
 use crate::emulator::keyboard::{Keyboard, KeyboardError};
 use crate::emulator::memory::Memory;
 use crate::emulator::registers::{Registers, RegistersError};
-use crate::emulator::sound::{Sound, SoundError};
+use crate::emulator::sound::{Audio, AudioError};
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use thiserror::Error;
@@ -27,7 +27,7 @@ pub enum CpuError {
     #[error(transparent)]
     KeyboardError(#[from] KeyboardError),
     #[error(transparent)]
-    SoundError(#[from] SoundError),
+    SoundError(#[from] AudioError),
 }
 
 impl Cpu {
@@ -44,13 +44,13 @@ impl Cpu {
     pub fn cycle(
         &mut self,
         display: &mut Display,
-        sound: &mut Sound,
+        sound: &mut Audio,
         keyboard: Keyboard,
     ) -> Result<(), CpuError> {
         if self.is_waiting_key {
             if let Some(key) = keyboard.get_key_pressed() {
                 self.registers
-                    .set_register(self.waiting_key_register, key.into())?;
+                    .set_register(self.waiting_key_register, key)?;
                 self.is_waiting_key = false;
             }
 
