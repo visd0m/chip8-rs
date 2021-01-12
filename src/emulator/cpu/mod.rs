@@ -1,9 +1,9 @@
+use crate::emulator::audio::{Audio, AudioError};
 use crate::emulator::cpu::instruction::Instruction;
 use crate::emulator::display::{Display, HEIGHT, WIDTH};
 use crate::emulator::keyboard::{Keyboard, KeyboardError};
 use crate::emulator::memory::Memory;
 use crate::emulator::registers::{Registers, RegistersError};
-use crate::emulator::sound::{Audio, AudioError};
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use thiserror::Error;

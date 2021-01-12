@@ -1,19 +1,19 @@
+use crate::emulator::audio::{Audio, AudioError};
 use crate::emulator::cpu::{Cpu, CpuError};
 use crate::emulator::display::{Display, HEIGHT, WIDTH};
 use crate::emulator::keyboard::Keyboard;
 use crate::emulator::memory::Memory;
-use crate::emulator::sound::{Audio, AudioError};
 use minifb::{Key, Scale, ScaleMode, Window, WindowOptions};
 use std::thread::sleep;
 use std::time::Duration;
 use thiserror::Error;
 
+mod audio;
 mod cpu;
 mod display;
 mod keyboard;
 mod memory;
 mod registers;
-mod sound;
 
 #[derive(Debug, Error)]
 pub enum EmulatorError {
