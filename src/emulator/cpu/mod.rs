@@ -3,9 +3,11 @@ use crate::emulator::display::{Display, HEIGHT, WIDTH};
 use crate::emulator::keyboard::{Keyboard, KeyboardError};
 use crate::emulator::memory::Memory;
 use crate::emulator::registers::{Registers, RegistersError};
+use crate::emulator::sound::{Sound, SoundError};
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use thiserror::Error;
+
 mod instruction;
 
 pub struct Cpu {
@@ -24,6 +26,8 @@ pub enum CpuError {
     RegistersError(#[from] RegistersError),
     #[error(transparent)]
     KeyboardError(#[from] KeyboardError),
+    #[error(transparent)]
+    SoundError(#[from] SoundError),
 }
 
 impl Cpu {
@@ -37,9 +41,13 @@ impl Cpu {
         }
     }
 
-    pub fn cycle(&mut self, display: &mut Display, keyboard: Keyboard) -> Result<(), CpuError> {
+    pub fn cycle(
+        &mut self,
+        display: &mut Display,
+        sound: &mut Sound,
+        keyboard: Keyboard,
+    ) -> Result<(), CpuError> {
         if self.is_waiting_key {
-            // dbg!(keyboard.get_key_pressed());
             if let Some(key) = keyboard.get_key_pressed() {
                 self.registers
                     .set_register(self.waiting_key_register, key.into())?;
@@ -50,7 +58,11 @@ impl Cpu {
         }
 
         if self.registers.st() > 0 {
-            // todo beep
+            sound.beep()?;
+        }
+
+        if self.registers.st() == 0 {
+            sound.stop_beep()?;
         }
 
         self.registers.decrement_st();
@@ -146,28 +158,23 @@ impl Cpu {
     }
 
     pub fn cls(&mut self, display: &mut Display) {
-        // dbg!("cls");
         display.clear()
     }
 
     pub fn ret(&mut self) -> Result<(), CpuError> {
-        // dbg!("ret");
         self.registers.pop_stack()?;
         Ok(())
     }
 
     pub fn jp(&mut self, addr: u16) {
-        // dbg!("jp");
         self.registers.set_pc(addr)
     }
 
     pub fn call(&mut self, addr: u16) -> Result<(), RegistersError> {
-        // dbg!("call");
         self.registers.push_stack(addr)
     }
 
     pub fn se(&mut self, v_x: u8, byte: u8) -> Result<(), RegistersError> {
-        // dbg!("se");
         let register_value = self.registers.register(v_x)?;
         if register_value == byte {
             self.registers.inc_pc_by(2)
@@ -177,7 +184,6 @@ impl Cpu {
     }
 
     pub fn sne(&mut self, v_x: u8, byte: u8) -> Result<(), RegistersError> {
-        // dbg!("sne");
         let register_value = self.registers.register(v_x)?;
         if register_value != byte {
             self.registers.inc_pc_by(2)
@@ -187,7 +193,6 @@ impl Cpu {
     }
 
     pub fn se_reg(&mut self, v_x: u8, v_y: u8) -> Result<(), RegistersError> {
-        // dbg!("se_reg");
         let register_1_value = self.registers.register(v_x)?;
         let register_2_value = self.registers.register(v_y)?;
         if register_1_value == register_2_value {
@@ -198,25 +203,21 @@ impl Cpu {
     }
 
     pub fn ld(&mut self, v_x: u8, byte: u8) -> Result<(), RegistersError> {
-        // dbg!("ld");
         self.registers.set_register(v_x, byte)
     }
 
     pub fn ld_reg(&mut self, v_x: u8, v_y: u8) -> Result<(), RegistersError> {
-        // dbg!("ld_reg");
         let register_2_value = self.registers.register(v_y)?;
         self.registers.set_register(v_x, register_2_value)
     }
 
     pub fn add(&mut self, v_x: u8, byte: u8) -> Result<(), RegistersError> {
-        // dbg!("add");
         let register_value = self.registers.register(v_x)?;
         self.registers
             .set_register(v_x, register_value.overflowing_add(byte).0)
     }
 
     pub fn add_reg(&mut self, v_x: u8, v_y: u8) -> Result<(), RegistersError> {
-        // dbg!("add_reg");
         let register_1_value = self.registers.register(v_x)?;
         let register_2_value = self.registers.register(v_y)?;
 
@@ -231,7 +232,6 @@ impl Cpu {
     }
 
     pub fn or(&mut self, v_x: u8, v_y: u8) -> Result<(), RegistersError> {
-        // dbg!("or");
         let register_1_value = self.registers.register(v_x)?;
         let register_2_value = self.registers.register(v_y)?;
 
@@ -240,7 +240,6 @@ impl Cpu {
     }
 
     pub fn and(&mut self, v_x: u8, v_y: u8) -> Result<(), RegistersError> {
-        // dbg!("and");
         let register_1_value = self.registers.register(v_x)?;
         let register_2_value = self.registers.register(v_y)?;
 
@@ -249,7 +248,6 @@ impl Cpu {
     }
 
     pub fn xor(&mut self, v_x: u8, v_y: u8) -> Result<(), RegistersError> {
-        // dbg!("xor");
         let register_1_value = self.registers.register(v_x)?;
         let register_2_value = self.registers.register(v_y)?;
 
@@ -258,7 +256,6 @@ impl Cpu {
     }
 
     pub fn sub(&mut self, v_x: u8, v_y: u8) -> Result<(), RegistersError> {
-        // dbg!("sub");
         let register_1_value = self.registers.register(v_x)?;
         let register_2_value = self.registers.register(v_y)?;
 
@@ -273,14 +270,12 @@ impl Cpu {
     }
 
     pub fn shr(&mut self, v_x: u8) -> Result<(), RegistersError> {
-        // dbg!("shr");
         let register_1_value = self.registers.register(v_x)?;
         self.registers.set_v_f((register_1_value & 0x1) as u8);
         self.registers.set_register(v_x, register_1_value / 2)
     }
 
     pub fn subn(&mut self, v_x: u8, v_y: u8) -> Result<(), RegistersError> {
-        // dbg!("subn");
         let register_1_value = self.registers.register(v_x)?;
         let register_2_value = self.registers.register(v_y)?;
 
@@ -295,7 +290,6 @@ impl Cpu {
     }
 
     pub fn shl(&mut self, v_x: u8) -> Result<(), RegistersError> {
-        // dbg!("shl");
         let register_1_value = self.registers.register(v_x)?;
         self.registers
             .set_v_f(((register_1_value & 0xA0) >> 7) as u8);
@@ -304,7 +298,6 @@ impl Cpu {
     }
 
     pub fn sne_reg(&mut self, v_x: u8, v_y: u8) -> Result<(), RegistersError> {
-        // dbg!("sne_reg");
         let register_1_value = self.registers.register(v_x)?;
         let register_2_value = self.registers.register(v_y)?;
         if register_1_value != register_2_value {
@@ -315,19 +308,16 @@ impl Cpu {
     }
 
     pub fn ldi(&mut self, addr: u16) {
-        // dbg!("ldi");
         self.registers.set_i(addr)
     }
 
     pub fn jp_0(&mut self, addr: u16) -> Result<(), RegistersError> {
-        // dbg!("jp_0");
         self.registers
             .set_pc(addr + self.registers.register(0)? as u16);
         Ok(())
     }
 
     pub fn rnd(&mut self, v_x: u8, byte: u8) -> Result<(), RegistersError> {
-        // dbg!("rnd");
         let random: u8 = self.rng.gen_range(0..255);
         self.registers.set_register(v_x, random & byte)
     }
@@ -339,7 +329,6 @@ impl Cpu {
         nibble: u8,
         display: &mut Display,
     ) -> Result<(), CpuError> {
-        // dbg!("draw");
         let x = self.registers.register(v_x)?;
         let y = self.registers.register(v_y)?;
 
@@ -370,8 +359,7 @@ impl Cpu {
     }
 
     pub fn skp(&mut self, v_x: u8, keyboard: Keyboard) -> Result<(), CpuError> {
-        // dbg!("skp");
-        if keyboard.is_key_pressed(self.registers.register(v_x)?)? {
+        if keyboard.is_key_pressed(self.registers.register(v_x)?) {
             self.registers.inc_pc_by(2);
         }
 
@@ -379,8 +367,7 @@ impl Cpu {
     }
 
     pub fn sknp(&mut self, v_x: u8, keyboard: Keyboard) -> Result<(), CpuError> {
-        // dbg!("sknp");
-        if !keyboard.is_key_pressed(self.registers.register(v_x)?)? {
+        if !keyboard.is_key_pressed(self.registers.register(v_x)?) {
             self.registers.inc_pc_by(2);
         }
 
@@ -388,31 +375,26 @@ impl Cpu {
     }
 
     pub fn ld_from_dt(&mut self, v_x: u8) -> Result<(), RegistersError> {
-        // dbg!("ld_from_dt");
         self.registers.set_register(v_x, self.registers.dt())
     }
 
     pub fn ld_k(&mut self, v_x: u8) -> Result<(), RegistersError> {
-        // dbg!("ld_k");
         self.is_waiting_key = true;
         self.waiting_key_register = v_x;
         Ok(())
     }
 
     pub fn ld_into_dt(&mut self, v_x: u8) -> Result<(), RegistersError> {
-        // dbg!("ld_into_dt");
         self.registers.set_dt(self.registers.register(v_x)?);
         Ok(())
     }
 
     pub fn ld_into_st(&mut self, v_x: u8) -> Result<(), RegistersError> {
-        // dbg!("ld_into_st");
         self.registers.set_st(self.registers.register(v_x)?);
         Ok(())
     }
 
     pub fn add_i(&mut self, v_x: u8) -> Result<(), RegistersError> {
-        // dbg!("add_i");
         self.registers.set_i(
             self.registers
                 .i()
@@ -423,14 +405,12 @@ impl Cpu {
     }
 
     pub fn ld_f(&mut self, v_x: u8) -> Result<(), CpuError> {
-        // dbg!("ld_f");
         let font = self.registers.register(v_x)?;
         self.registers.set_i(self.memory.get_font_address(font));
         Ok(())
     }
 
     pub fn ld_b(&mut self, v_x: u8) -> Result<(), RegistersError> {
-        // dbg!("ld_b");
         let value = self.registers.register(v_x)?;
 
         let units = value % 10;
@@ -445,7 +425,6 @@ impl Cpu {
     }
 
     pub fn ld_batch_into(&mut self, v_x: u8) -> Result<(), CpuError> {
-        // dbg!("ld_batch_into");
         for index in 0..(v_x + 1) {
             let to_write = self.registers.register(index)?;
             self.memory
@@ -456,7 +435,6 @@ impl Cpu {
     }
 
     pub fn ld_batch_from(&mut self, v_x: u8) -> Result<(), CpuError> {
-        // dbg!("ld_batch_from");
         for index in 0..(v_x + 1) {
             let to_load = self.memory.read_8(self.registers.i() + index as u16);
 
