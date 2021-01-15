@@ -3,6 +3,14 @@ use minifb::Window;
 pub const WIDTH: usize = 64;
 pub const HEIGHT: usize = 32;
 
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum DisplayError {
+    #[error(transparent)]
+    UpdateError(#[from] minifb::Error),
+}
+
 #[derive(Debug)]
 pub struct Display {
     window: Window,
@@ -29,17 +37,17 @@ impl Display {
         self.buffer[index] ^= value;
     }
 
-    pub fn update(&mut self) {
-        self.window
-            .update_with_buffer(&self.buffer, WIDTH, HEIGHT)
-            .unwrap();
+    pub fn draw(&mut self) -> Result<(), DisplayError> {
+        Ok(self
+            .window
+            .update_with_buffer(&self.buffer, WIDTH, HEIGHT)?)
     }
 
     pub fn clear(&mut self) {
         self.buffer = vec![0x00000000; WIDTH * HEIGHT]
     }
 
-    pub fn window(&self) -> &Window {
-        &self.window
+    pub fn window_mut(&mut self) -> &mut Window {
+        &mut self.window
     }
 }

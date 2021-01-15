@@ -30,11 +30,11 @@ fn map_key(key: Key) -> Result<u8, KeyboardError> {
 }
 
 #[derive(Debug)]
-pub struct Keyboard {
+pub struct KeyboardState {
     keys_pressed: Vec<u8>,
 }
 
-impl Keyboard {
+impl KeyboardState {
     pub fn new(keys: Vec<Key>) -> Self {
         Self {
             keys_pressed: keys

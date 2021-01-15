@@ -1,11 +1,12 @@
 use crate::emulator::audio::{Audio, AudioError};
 use crate::emulator::cpu::instruction::Instruction;
 use crate::emulator::display::{Display, HEIGHT, WIDTH};
-use crate::emulator::keyboard::{Keyboard, KeyboardError};
+use crate::emulator::keyboard::{KeyboardError, KeyboardState};
 use crate::emulator::memory::Memory;
 use crate::emulator::registers::{Registers, RegistersError};
 use rand::rngs::ThreadRng;
 use rand::Rng;
+use std::time::Instant;
 use thiserror::Error;
 
 mod instruction;
@@ -15,6 +16,7 @@ pub struct Cpu {
     registers: Registers,
     is_waiting_key: bool,
     waiting_key_register: u8,
+    timer: Instant,
     rng: ThreadRng,
 }
 
@@ -37,6 +39,7 @@ impl Cpu {
             registers: Default::default(),
             is_waiting_key: false,
             waiting_key_register: 0,
+            timer: Instant::now(),
             rng: rand::thread_rng(),
         }
     }
@@ -45,16 +48,14 @@ impl Cpu {
         &mut self,
         display: &mut Display,
         sound: &mut Audio,
-        keyboard: Keyboard,
+        keyboard: KeyboardState,
     ) -> Result<(), CpuError> {
-        if self.is_waiting_key {
-            if let Some(key) = keyboard.get_key_pressed() {
-                self.registers
-                    .set_register(self.waiting_key_register, key)?;
-                self.is_waiting_key = false;
-            }
+        let now = Instant::now();
 
-            return Ok(());
+        if now.duration_since(self.timer).as_micros() >= 16666 {
+            self.timer = now;
+            self.registers.decrement_st();
+            self.registers.decrement_dt();
         }
 
         if self.registers.st() > 0 {
@@ -65,8 +66,15 @@ impl Cpu {
             sound.stop_beep()?;
         }
 
-        self.registers.decrement_st();
-        self.registers.decrement_dt();
+        if self.is_waiting_key {
+            if let Some(key) = keyboard.get_key_pressed() {
+                self.registers
+                    .set_register(self.waiting_key_register, key)?;
+                self.is_waiting_key = false;
+            }
+
+            return Ok(());
+        }
 
         let instruction = self.memory.read_16(self.registers.pc());
         self.registers.inc_pc_by(2);
@@ -134,7 +142,11 @@ impl Cpu {
         }
     }
 
-    pub fn xennn(&mut self, instruction: Instruction, keyboard: Keyboard) -> Result<(), CpuError> {
+    pub fn xennn(
+        &mut self,
+        instruction: Instruction,
+        keyboard: KeyboardState,
+    ) -> Result<(), CpuError> {
         match instruction.suffix_8() {
             0x9e => Ok(self.skp(instruction.x(), keyboard)?),
             0xa1 => Ok(self.sknp(instruction.x(), keyboard)?),
@@ -358,7 +370,7 @@ impl Cpu {
         Ok(())
     }
 
-    pub fn skp(&mut self, v_x: u8, keyboard: Keyboard) -> Result<(), CpuError> {
+    pub fn skp(&mut self, v_x: u8, keyboard: KeyboardState) -> Result<(), CpuError> {
         if keyboard.is_key_pressed(self.registers.register(v_x)?) {
             self.registers.inc_pc_by(2);
         }
@@ -366,7 +378,7 @@ impl Cpu {
         Ok(())
     }
 
-    pub fn sknp(&mut self, v_x: u8, keyboard: Keyboard) -> Result<(), CpuError> {
+    pub fn sknp(&mut self, v_x: u8, keyboard: KeyboardState) -> Result<(), CpuError> {
         if !keyboard.is_key_pressed(self.registers.register(v_x)?) {
             self.registers.inc_pc_by(2);
         }

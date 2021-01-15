@@ -1,11 +1,9 @@
 use crate::emulator::audio::{Audio, AudioError};
 use crate::emulator::cpu::{Cpu, CpuError};
-use crate::emulator::display::{Display, HEIGHT, WIDTH};
-use crate::emulator::keyboard::Keyboard;
+use crate::emulator::display::{Display, DisplayError, HEIGHT, WIDTH};
+use crate::emulator::keyboard::KeyboardState;
 use crate::emulator::memory::Memory;
 use minifb::{Key, Scale, ScaleMode, Window, WindowOptions};
-use std::thread::sleep;
-use std::time::Duration;
 use thiserror::Error;
 
 mod audio;
@@ -21,6 +19,10 @@ pub enum EmulatorError {
     CpuError(#[from] CpuError),
     #[error(transparent)]
     SoundError(#[from] AudioError),
+    #[error(transparent)]
+    WindowError(#[from] minifb::Error),
+    #[error(transparent)]
+    DisplayError(#[from] DisplayError),
 }
 
 pub struct Emulator {
@@ -35,7 +37,7 @@ impl Emulator {
         memory.load_rom(rom);
 
         let mut window = Window::new(
-            "Test - ESC to exit",
+            "Chip-8 - ESC to exit",
             WIDTH,
             HEIGHT,
             WindowOptions {
@@ -43,11 +45,9 @@ impl Emulator {
                 scale_mode: ScaleMode::Stretch,
                 ..WindowOptions::default()
             },
-        )
-        .unwrap_or_else(|e| {
-            panic!("{}", e);
-        });
-        window.limit_update_rate(Some(std::time::Duration::from_micros(5)));
+        )?;
+
+        window.limit_update_rate(Some(std::time::Duration::from_millis(2)));
 
         Ok(Self {
             display: Display::new(window),
@@ -57,15 +57,15 @@ impl Emulator {
     }
 
     pub fn run(&mut self) -> Result<(), EmulatorError> {
-        while self.display.window().is_open() && !self.display.window().is_key_down(Key::Escape) {
-            let keys = self.display.window().get_keys().unwrap_or_default();
+        while self.display.window_mut().is_open()
+            && !self.display.window_mut().is_key_down(Key::Escape)
+        {
+            let keys = self.display.window_mut().get_keys().unwrap_or_default();
 
             self.cpu
-                .cycle(&mut self.display, &mut self.sound, Keyboard::new(keys))?;
+                .cycle(&mut self.display, &mut self.sound, KeyboardState::new(keys))?;
 
-            self.display.update();
-
-            sleep(Duration::from_millis(5));
+            self.display.draw()?;
         }
 
         Ok(())
