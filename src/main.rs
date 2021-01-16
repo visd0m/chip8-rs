@@ -1,4 +1,4 @@
-use crate::emulator::Emulator;
+use crate::emulator::frontend::native_window::NativeWindowFrontend;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -19,9 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut file = File::open(Path::new(opt.file.as_str()))?;
     file.read_to_end(&mut rom)?;
 
-    let mut emu = Emulator::new(&rom)?;
-
-    emu.run()?;
+    emulator::run(&rom, &mut NativeWindowFrontend::new()?)?;
 
     Ok(())
 }

@@ -1,15 +1,16 @@
-use crate::emulator::audio::{Audio, AudioError};
+use crate::emulator::audio::Audio;
 use crate::emulator::cpu::instruction::Instruction;
-use crate::emulator::display::{Display, HEIGHT, WIDTH};
-use crate::emulator::keyboard::{KeyboardError, KeyboardState};
+use crate::emulator::cpu::registers::{Registers, RegistersError};
+use crate::emulator::display::Display;
+use crate::emulator::keyboard::KeyboardState;
 use crate::emulator::memory::Memory;
-use crate::emulator::registers::{Registers, RegistersError};
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use std::time::Instant;
 use thiserror::Error;
 
 mod instruction;
+mod registers;
 
 pub struct Cpu {
     memory: Memory,
@@ -27,9 +28,7 @@ pub enum CpuError {
     #[error(transparent)]
     RegistersError(#[from] RegistersError),
     #[error(transparent)]
-    KeyboardError(#[from] KeyboardError),
-    #[error(transparent)]
-    SoundError(#[from] AudioError),
+    CpuError(#[from] Box<dyn std::error::Error>),
 }
 
 impl Cpu {
@@ -47,8 +46,8 @@ impl Cpu {
     pub fn cycle(
         &mut self,
         display: &mut Display,
-        sound: &mut Audio,
-        keyboard: KeyboardState,
+        audio: &mut dyn Audio,
+        keyboard_state: KeyboardState,
     ) -> Result<(), CpuError> {
         let now = Instant::now();
 
@@ -59,15 +58,15 @@ impl Cpu {
         }
 
         if self.registers.st() > 0 {
-            sound.beep()?;
+            audio.beep()?;
         }
 
         if self.registers.st() == 0 {
-            sound.stop_beep()?;
+            audio.stop_beep();
         }
 
         if self.is_waiting_key {
-            if let Some(key) = keyboard.get_key_pressed() {
+            if let Some(key) = keyboard_state.get_key_pressed() {
                 self.registers
                     .set_register(self.waiting_key_register, key)?;
                 self.is_waiting_key = false;
@@ -102,7 +101,7 @@ impl Cpu {
             0xb => Ok(self.jp_0(i.nnn())?),
             0xc => Ok(self.rnd(i.x(), i.kk())?),
             0xd => Ok(self.draw(i.x(), i.y(), i.suffix_4(), display)?),
-            0xe => self.xennn(i, keyboard),
+            0xe => self.xennn(i, keyboard_state),
             0xf => self.xfnnn(i),
             _ => Err(CpuError::UnhandledInstruction(instruction)),
         }?;
@@ -349,8 +348,8 @@ impl Cpu {
             let byte = self.memory.read_8(self.registers.i() + row as u16);
 
             for column in 0..8 {
-                let x = (x + column) % WIDTH as u8;
-                let y = (y + row) % HEIGHT as u8;
+                let x = (x + column) % Display::width() as u8;
+                let y = (y + row) % Display::height() as u8;
 
                 let old_value = display.pixel(x as usize, y as usize);
                 let to_set: u32 = if (((byte as usize) >> (7 - column)) & 0x1) > 0 {

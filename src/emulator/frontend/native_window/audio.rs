@@ -1,18 +1,12 @@
+use crate::emulator;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{
-    BuildStreamError, DefaultStreamConfigError, Device, PauseStreamError, PlayStreamError, Sample,
-    SampleFormat, Stream, StreamConfig,
-};
+use cpal::{BuildStreamError, Device, PlayStreamError, Sample, SampleFormat, Stream, StreamConfig};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum AudioError {
     #[error("No available audio output device")]
     NoOutputDeviceError,
-    #[error(transparent)]
-    DefaultStreamConfigError(#[from] DefaultStreamConfigError),
-    #[error(transparent)]
-    PauseStreamError(#[from] PauseStreamError),
     #[error(transparent)]
     PlayStreamError(#[from] PlayStreamError),
     #[error(transparent)]
@@ -35,8 +29,10 @@ impl Audio {
             stream: None,
         })
     }
+}
 
-    pub fn beep(&mut self) -> Result<(), AudioError> {
+impl emulator::audio::Audio for Audio {
+    fn beep(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.stream.is_some() {
             return Ok(());
         }
@@ -54,12 +50,10 @@ impl Audio {
         Ok(())
     }
 
-    pub fn stop_beep(&mut self) -> Result<(), AudioError> {
+    fn stop_beep(&mut self) {
         if self.stream.is_some() {
             self.stream = None
         }
-
-        Ok(())
     }
 }
 
