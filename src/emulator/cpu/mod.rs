@@ -59,9 +59,7 @@ impl Cpu {
 
         if self.registers.st() > 0 {
             audio.beep()?;
-        }
-
-        if self.registers.st() == 0 {
+        } else {
             audio.stop_beep();
         }
 
