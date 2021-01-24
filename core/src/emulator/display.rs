@@ -3,34 +3,34 @@ const HEIGHT: usize = 32;
 
 #[derive(Debug)]
 pub struct Display {
-    buffer: Vec<u32>,
+    buffer: Vec<bool>,
 }
 
 impl Default for Display {
     fn default() -> Self {
         Self {
-            buffer: vec![0x00000000; WIDTH * HEIGHT],
+            buffer: vec![false; WIDTH * HEIGHT],
         }
     }
 }
 
 impl Display {
-    pub fn buffer(&mut self) -> &mut Vec<u32> {
+    pub fn buffer(&mut self) -> &mut Vec<bool> {
         &mut self.buffer
     }
 
     pub fn pixel(&mut self, x: usize, y: usize) -> bool {
         let index = x + (y * WIDTH);
-        self.buffer[index] > 0
+        self.buffer[index]
     }
 
-    pub fn set_pixel(&mut self, x: usize, y: usize, value: u32) {
+    pub fn set_pixel(&mut self, x: usize, y: usize, value: bool) {
         let index = x + (y * WIDTH);
         self.buffer[index] ^= value;
     }
 
     pub fn clear(&mut self) {
-        self.buffer = vec![0x00000000; WIDTH * HEIGHT]
+        self.buffer = vec![false; WIDTH * HEIGHT]
     }
 
     pub fn width() -> usize {

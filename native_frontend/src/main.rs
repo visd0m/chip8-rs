@@ -1,10 +1,13 @@
-use crate::emulator::frontend::native_window::NativeWindowFrontend;
+use crate::native_frontend::NativeWindowFrontend;
+use core::emulator;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use structopt::StructOpt;
 
-mod emulator;
+mod audio;
+mod key_mapper;
+mod native_frontend;
 
 #[derive(Debug, StructOpt)]
 pub struct Opt {

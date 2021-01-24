@@ -1,0 +1,10 @@
+[package]
+name = "core"
+version = "0.1.0"
+authors = ["Domenico Visconti <domenico.visconti819@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+thiserror = "1.0.23"
+random = "0.12.2"
+instant = {version = "0.1.9", features = [ "wasm-bindgen", "now" ]}
