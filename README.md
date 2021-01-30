@@ -4,12 +4,15 @@ Chip-8 emulator implementation in rust.
 
 [Hardware specifications](http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#3.1).
 
-#### Usage
+2 emulator frontend are available in this project.
 
-```shell script
-cargo run -- release -- -f <rom_file>
+#### Native frontend implementation
+
+Runt with
+```bash
+cargo run --bin native_frontend --release -- -f <rom_file>
 ```
 
-#### Todos
+#### Wasm frontend implementation
 
-- [ ] menu to select rom
+Check the workspace member [README](/wasm_frontend/README.md).

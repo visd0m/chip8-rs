@@ -4,9 +4,7 @@ use crate::emulator::cpu::registers::{Registers, RegistersError};
 use crate::emulator::display::Display;
 use crate::emulator::keyboard::KeyboardState;
 use crate::emulator::memory::Memory;
-use rand::rngs::ThreadRng;
-use rand::Rng;
-use std::time::Instant;
+use random::Source;
 use thiserror::Error;
 
 mod instruction;
@@ -17,8 +15,8 @@ pub struct Cpu {
     registers: Registers,
     is_waiting_key: bool,
     waiting_key_register: u8,
-    timer: Instant,
-    rng: ThreadRng,
+    timer: instant::Instant,
+    rng: random::Default,
 }
 
 #[derive(Debug, Error)]
@@ -38,8 +36,8 @@ impl Cpu {
             registers: Default::default(),
             is_waiting_key: false,
             waiting_key_register: 0,
-            timer: Instant::now(),
-            rng: rand::thread_rng(),
+            timer: instant::Instant::now(),
+            rng: random::default().seed([42, 69]),
         }
     }
 
@@ -49,7 +47,7 @@ impl Cpu {
         audio: &mut dyn Audio,
         keyboard_state: KeyboardState,
     ) -> Result<(), CpuError> {
-        let now = Instant::now();
+        let now = instant::Instant::now();
 
         if now.duration_since(self.timer).as_micros() >= 16666 {
             self.timer = now;
@@ -327,7 +325,7 @@ impl Cpu {
     }
 
     pub fn rnd(&mut self, v_x: u8, byte: u8) -> Result<(), RegistersError> {
-        let random: u8 = self.rng.gen_range(0..255);
+        let random: u8 = self.rng.read::<u8>();
         self.registers.set_register(v_x, random & byte)
     }
 
@@ -350,11 +348,7 @@ impl Cpu {
                 let y = (y + row) % Display::height() as u8;
 
                 let old_value = display.pixel(x as usize, y as usize);
-                let to_set: u32 = if (((byte as usize) >> (7 - column)) & 0x1) > 0 {
-                    0xffffffff
-                } else {
-                    0x00000000
-                };
+                let to_set: bool = (((byte as usize) >> (7 - column)) & 0x1) > 0;
 
                 display.set_pixel(x as usize, y as usize, to_set);
 
