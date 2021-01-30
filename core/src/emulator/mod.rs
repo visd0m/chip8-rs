@@ -3,14 +3,11 @@ use thiserror::Error;
 use crate::emulator::audio::Audio;
 use crate::emulator::cpu::{Cpu, CpuError};
 use crate::emulator::display::Display;
-use crate::emulator::frontend::Frontend;
 use crate::emulator::keyboard::{KeyMapper, KeyboardState};
-use crate::emulator::memory::Memory;
 
 pub mod audio;
 pub mod cpu;
 pub mod display;
-pub mod frontend;
 pub mod keyboard;
 pub mod memory;
 
@@ -20,15 +17,6 @@ pub enum EmulatorError {
     EmulatorError(#[from] Box<dyn std::error::Error>),
     #[error(transparent)]
     CpuError(#[from] CpuError),
-}
-
-pub fn run(rom: &[u8], frontend: &mut dyn Frontend) -> Result<(), EmulatorError> {
-    let mut memory = Memory::default();
-    memory.load_rom(rom);
-
-    frontend.run(&mut Cpu::new(memory), &mut Display::default())?;
-
-    Ok(())
 }
 
 pub fn tick<K>(

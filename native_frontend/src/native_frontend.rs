@@ -32,8 +32,8 @@ impl NativeWindowFrontend {
     }
 }
 
-impl emulator::frontend::Frontend for NativeWindowFrontend {
-    fn run(
+impl NativeWindowFrontend {
+    pub fn run(
         &mut self,
         cpu: &mut emulator::cpu::Cpu,
         display: &mut emulator::display::Display,

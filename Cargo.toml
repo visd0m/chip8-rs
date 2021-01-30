@@ -5,3 +5,7 @@ members = [
     "wasm_frontend",
     "native_frontend"
 ]
+
+[profile.release]
+# Tell `rustc` to optimize for small code size.
+opt-level = "s"
