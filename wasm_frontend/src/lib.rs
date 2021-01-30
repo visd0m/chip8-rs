@@ -1,11 +1,9 @@
 mod audio;
 mod key_mapper;
 mod utils;
-mod wasm_frontend;
 
 use crate::audio::Audio;
 use crate::key_mapper::KeyMapper;
-use crate::wasm_frontend::WasmFrontend;
 use core::emulator;
 use core::emulator::cpu::Cpu;
 use core::emulator::display::Display;
@@ -13,13 +11,12 @@ use core::emulator::keyboard::KeyboardState;
 use core::emulator::memory::Memory;
 use gloo_events::{EventListener, EventListenerOptions, EventListenerPhase};
 use gloo_timers::callback::Interval;
-use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::Clamped;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::__rt::std::sync::RwLock;
-use web_sys::{CanvasRenderingContext2d, ImageData, KeyboardEvent, Window};
+use web_sys::{CanvasRenderingContext2d, Document, ImageData, KeyboardEvent, Window};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -55,8 +52,14 @@ pub fn run_emu(rom_bytes: &[u8]) {
         .unwrap();
 
     let keys: Arc<RwLock<Vec<String>>> = Arc::new(RwLock::new(vec![]));
-    let keys_down_reference_event_listener = keys.clone();
 
+    setup_key_down_listener(&document, keys.clone());
+    setup_key_up_listener(&document, keys.clone());
+
+    run(context, rom_bytes, keys.clone());
+}
+
+fn setup_key_down_listener(document: &Document, keys: Arc<RwLock<Vec<String>>>) {
     let on_key_down = EventListener::new_with_options(
         &document,
         "keydown",
@@ -65,7 +68,7 @@ pub fn run_emu(rom_bytes: &[u8]) {
             passive: true,
         },
         move |event| {
-            let mut keys = keys_down_reference_event_listener.write().unwrap();
+            let mut keys = keys.write().unwrap();
             let keyboard_event = event.clone().dyn_into::<KeyboardEvent>().unwrap();
             let mut event_string = String::from("");
             event_string.push_str(&keyboard_event.key());
@@ -74,8 +77,9 @@ pub fn run_emu(rom_bytes: &[u8]) {
     );
 
     on_key_down.forget();
+}
 
-    let keys_up_reference_event_listener = keys.clone();
+fn setup_key_up_listener(document: &Document, keys: Arc<RwLock<Vec<String>>>) {
     let on_key_up = EventListener::new_with_options(
         &document,
         "keyup",
@@ -83,28 +87,25 @@ pub fn run_emu(rom_bytes: &[u8]) {
             phase: EventListenerPhase::Capture,
             passive: true,
         },
-        move |event| {
-            let mut keys = keys_up_reference_event_listener.write().unwrap();
+        move |_event| {
+            let mut keys = keys.write().unwrap();
             keys.clear()
         },
     );
 
     on_key_up.forget();
+}
 
+fn run(context: CanvasRenderingContext2d, rom_bytes: &[u8], keys: Arc<RwLock<Vec<String>>>) {
     let mut memory = Memory::default();
     memory.load_rom(rom_bytes);
-
     let mut cpu = Cpu::new(memory);
     let mut display = Display::default();
 
     let mut audio = Audio {};
 
-    let keys_reference_interval = keys.clone();
-
     let i = Interval::new(1 / 100, move || {
-        let mut keys = keys_reference_interval.read().unwrap();
-
-        let state = KeyboardState::new(keys.clone(), &KeyMapper {});
+        let state = KeyboardState::new(keys.read().unwrap().clone(), &KeyMapper {});
 
         cpu.cycle(&mut display, &mut audio, state).unwrap();
 
