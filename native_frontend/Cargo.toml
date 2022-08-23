@@ -9,6 +9,6 @@ edition = "2018"
 [dependencies]
 core = { path = "../core" }
 minifb = "0.19.1"
-cpal = "0.13.1"
+cpal = "0.14.0"
 structopt = "0.3.21"
 thiserror = "1.0.23"
