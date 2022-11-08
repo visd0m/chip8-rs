@@ -6,5 +6,5 @@ edition = "2018"
 
 [dependencies]
 thiserror = "1.0.23"
-random = "0.12.2"
+random = "0.13.2"
 instant = {version = "0.1.9", features = [ "wasm-bindgen", "now" ]}
